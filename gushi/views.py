@@ -3,6 +3,7 @@ import os
 import time
 
 import django_filters
+from django.core.exceptions import ObjectDoesNotExist
 from django.shortcuts import render
 
 # Create your views here.
@@ -14,7 +15,7 @@ from setuptools.namespaces import flatten
 from zhconv import convert_for_mw
 
 from .models import Author, TangShi, SongCi, TangShiSanBai, Strains, SongCiSanBai, GuShiPinYins
-from .serializer import AuthorSerializer, TangShiSerializer
+from .serializer import AuthorSerializer, TangShiSerializer, SongCiSerializer
 from .utils.custom_json_response import JsonResponse
 from .utils.custom_pagination import LargeResultsSetPagination
 from .utils.custom_viewset_base import CustomViewBase
@@ -23,6 +24,7 @@ from .utils.custom_viewset_base import CustomViewBase
 class TangShiView(CustomViewBase):
     queryset = TangShi.objects.all().order_by('id')
     serializer_class = TangShiSerializer
+    data_object = TangShi.objects
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
@@ -36,32 +38,68 @@ class TangShiView(CustomViewBase):
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
+        # 繁体转换简体
         zh_cn_title = zh_ft_convert_zh_cn(instance.title)
         zh_cn_author = zh_ft_convert_zh_cn(instance.author)
         zh_cn_paragraphs = zh_ft_convert_zh_cn(instance.paragraphs)
-
         zh_cn_paragraphs = zh_cn_paragraphs.replace("\'", "\"")
-
-        _t = TangShi.objects.get(poet_id=instance.poet_id)
+        print(instance.author)
+        print(instance.poet_id,1111)
+        _t = self.data_object.get(poet_id=instance.poet_id)
         _t.author = zh_cn_author
         _t.title = zh_cn_title
         _t.paragraphs = zh_cn_paragraphs
-        if _t.pinyin == None:
+        # 添加拼音
+        if _t.pinyin is None:
             _list = json.loads(zh_cn_paragraphs)
             pinyi_paragraphs = []
             for i in _list:
                 _pinyi_paragraphs = pinyin_convert(i)
                 pinyi_paragraphs += _pinyi_paragraphs
-            instance = GuShiPinYins.objects.update_or_create(author_pinyin=pinyin_convert(zh_cn_author),
-                                                             title_pinyin=pinyin_convert(zh_cn_title),
-                                                             paragraphs_pinyin=pinyi_paragraphs)
-            _t.pinyin = instance[0]
+            pinyi_instance = GuShiPinYins.objects.update_or_create(author_pinyin=pinyin_convert(zh_cn_author),
+                                                                   title_pinyin=pinyin_convert(zh_cn_title),
+                                                                   paragraphs_pinyin=pinyi_paragraphs)
+            _t.pinyin = pinyi_instance[0]
 
-        _t.save()
+        try:
+            # 关联节奏
+            if _t.strains is None and instance.poet_id is not None:
+                strains = Strains.objects.get(poet_id=instance.poet_id)
+                print(strains)
+                if strains is not None:
+                    _t.strains = strains
 
-        instance = self.get_object()
-        serializer = self.get_serializer(instance)
-        return JsonResponse(data=serializer.data, code=200, msg="success")
+            # 关联作者表
+            if _t.author_id is None and instance.poet_id is not None:
+                print(instance.author)
+                author_instance = Author.objects.get(name=instance.author)
+                if author_instance is not None:
+                    _t.author_id = author_instance
+        except ObjectDoesNotExist as error:
+           print(error,"error")
+        finally:
+            _t.save()
+            instance = self.get_object()
+            serializer = self.get_serializer(instance)
+            return JsonResponse(data=serializer.data, code=200, msg="success")
+
+
+class SongCiView(TangShiView):
+    queryset = SongCi.objects.all().order_by('id')
+    serializer_class = SongCiSerializer
+    data_object = SongCi.objects
+
+
+class TangShiSanBaiView(TangShiView):
+    queryset = TangShiSanBai.objects.all().order_by('id')
+    serializer_class = TangShiSerializer
+    data_object = TangShiSanBai.objects
+
+
+class SongCiSanBaiView(TangShiView):
+    queryset = SongCiSanBai.objects.all().order_by('id')
+    serializer_class = SongCiSerializer
+    data_object = SongCiSanBai.objects
 
 
 def pinyin_convert(text):
@@ -80,26 +118,74 @@ def zh_ft_convert_zh_cn(text):
         return text
 
 
+class Search(filters.SearchFilter):
+    search_param = "keyword"
+
+
 class SearchView(APIView):
 
     def get(self, request):
         search_type = request.GET.get('type')
+        source = request.GET.get('source')
         pagination_class = LargeResultsSetPagination()
-        search_class = filters.SearchFilter()
+        search_class = Search()
 
         self.search_fields = [search_type]
+        print(source)
+        if source == "TangShi":
+            print(source, 1)
+            contentlist = TangShi.objects.all().order_by('id')
 
-        list = TangShi.objects.all().order_by('id')
+            search_query = search_class.filter_queryset(request=request, queryset=contentlist, view=self)
 
-        search_query = search_class.filter_queryset(request=request, queryset=list, view=self)
+            page_query = pagination_class.paginate_queryset(queryset=search_query, request=request, view=self)
 
-        page_query = pagination_class.paginate_queryset(queryset=search_query, request=request, view=self)
+            result_serializer = TangShiSerializer(page_query, many=True)
 
-        result_serializer = TangShiSerializer(page_query, many=True)
+            page_result = pagination_class.get_paginated_response(result_serializer.data)
 
-        page_result = pagination_class.get_paginated_response(result_serializer.data)
+            return page_result
+        elif source == "SongCi":
+            print(source, 2)
+            contentlist = SongCi.objects.all().order_by('id')
 
-        return page_result
+            search_query = search_class.filter_queryset(request=request, queryset=contentlist, view=self)
+
+            page_query = pagination_class.paginate_queryset(queryset=search_query, request=request, view=self)
+
+            result_serializer = SongCiSerializer(page_query, many=True)
+
+            page_result = pagination_class.get_paginated_response(result_serializer.data)
+
+            return page_result
+        elif source == "TangshiSanBai":
+            print(source, 3)
+            contentlist = TangShiSanBai.objects.all().order_by('id')
+
+            search_query = search_class.filter_queryset(request=request, queryset=contentlist, view=self)
+
+            page_query = pagination_class.paginate_queryset(queryset=search_query, request=request, view=self)
+
+            result_serializer = TangShiSerializer(page_query, many=True)
+
+            page_result = pagination_class.get_paginated_response(result_serializer.data)
+
+            return page_result
+        elif source == "SongCiSanBai":
+            print(source, 4)
+            contentlist = SongCi.objects.all().order_by('id')
+
+            search_query = search_class.filter_queryset(request=request, queryset=contentlist, view=self)
+
+            page_query = pagination_class.paginate_queryset(queryset=search_query, request=request, view=self)
+
+            result_serializer = SongCiSerializer(page_query, many=True)
+
+            page_result = pagination_class.get_paginated_response(result_serializer.data)
+
+            return page_result
+        else:
+            return pagination_class.get_none_page_response()
 
 
 class GushiView(APIView):
@@ -113,7 +199,8 @@ class GushiView(APIView):
         # saveTangShiStrains()
         # savesongci()
         # savesongciSanbai()
-        return JsonResponse(code=233, msg="fail")
+        saveSongCiStrains()
+        return JsonResponse(code=233, msg="success")
 
 
 def check_json(f, _dir):
@@ -291,6 +378,31 @@ def saveTangShiStrains():
     start_time = time.time()
     for i in range(0, 57):
         filePath = "poet.tang.{}000.json".format(i)
+        print(filePath)
+        list = check_json(filePath, "gushi/chinese-poetry/strains/json")
+        for idx in range(0, len(list)):
+            print(filePath, idx)
+            item = list[idx]
+            print(item)
+            strains = item["strains"]
+            id = item["id"]
+            try:
+                Strains.objects.update_or_create(
+                    strains=strains,
+                    poet_id=id,
+                )
+            except ValueError:
+                print(ValueError)
+
+    end_time = time.time()
+    # 关闭数据库连接
+    print("耗时: {:.2f}秒".format(end_time - start_time))
+
+
+def saveSongCiStrains():
+    start_time = time.time()
+    for i in range(168, 254):
+        filePath = "poet.song.{}000.json".format(i)
         print(filePath)
         list = check_json(filePath, "gushi/chinese-poetry/strains/json")
         for idx in range(0, len(list)):

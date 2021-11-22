@@ -23,3 +23,13 @@ class LargeResultsSetPagination(PageNumberPagination):
             ('previous', self.get_previous_link()),
             ('data', data),
         ]))
+
+    def get_none_page_response(self):
+        return Response(OrderedDict([
+            ('code', 200),
+            ('message', "success"),
+            ('count', None),
+            ('next', None),
+            ('previous', None),
+            ('data', None),
+        ]))
