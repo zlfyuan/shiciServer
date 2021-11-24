@@ -401,7 +401,7 @@ def saveTangShiStrains():
 
 def saveSongCiStrains():
     start_time = time.time()
-    for i in range(168, 254):
+    for i in range(254, 255):
         filePath = "poet.song.{}000.json".format(i)
         print(filePath)
         list = check_json(filePath, "gushi/chinese-poetry/strains/json")
