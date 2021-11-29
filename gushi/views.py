@@ -2,31 +2,51 @@ import json
 import os
 import time
 
-import django_filters
 from django.core.exceptions import ObjectDoesNotExist
-from django.shortcuts import render
 
 # Create your views here.
 from pypinyin import pinyin
 from rest_framework import filters
-from rest_framework.generics import ListAPIView
 from rest_framework.views import APIView
 from setuptools.namespaces import flatten
 from zhconv import convert_for_mw
 
 from .models import Author, TangShi, SongCi, TangShiSanBai, Strains, SongCiSanBai, GuShiPinYins
-from .serializer import AuthorSerializer, TangShiSerializer, SongCiSerializer
+from .serializer import TangShiSerializer, SongCiSerializer
 from .utils.custom_json_response import JsonResponse
 from .utils.custom_pagination import LargeResultsSetPagination
 from .utils.custom_viewset_base import CustomViewBase
 
 
-class TangShiView(CustomViewBase):
-    queryset = TangShi.objects.all().order_by('id')
-    serializer_class = TangShiSerializer
-    data_object = TangShi.objects
+class GushiView(CustomViewBase):
+    data_object = None
+
+    def get_queryset_serializer(self, gushi_type):
+        if gushi_type == "tangshi":
+            instance = TangShi.objects.all().order_by('id')
+            serializer = TangShiSerializer
+            data_object = TangShi.objects
+        elif gushi_type == "songci":
+            instance = SongCi.objects.all().order_by('id')
+            serializer = SongCiSerializer
+            data_object = SongCi.objects
+        elif gushi_type == "tangshisanbai":
+            instance = TangShiSanBai.objects.all().order_by('id')
+            serializer = TangShiSerializer
+            data_object = TangShiSanBai.objects
+        elif gushi_type == "songcisanbai":
+            instance = SongCiSanBai.objects.all().order_by('id')
+            serializer = SongCiSerializer
+            data_object = SongCiSanBai.objects
+        else:
+            return JsonResponse(msg="fail", code=233)
+        return instance, serializer, data_object
 
     def list(self, request, *args, **kwargs):
+        gushi_type = kwargs.pop('type', '')
+
+        self.queryset, self.serializer_class, self.data_object = self.get_queryset_serializer(gushi_type)
+
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
         if page is not None:
@@ -37,14 +57,16 @@ class TangShiView(CustomViewBase):
         return JsonResponse(data=serializer.data, code=200, msg="success")
 
     def retrieve(self, request, *args, **kwargs):
+        gushi_type = kwargs.pop('type', '')
+
+        self.queryset, self.serializer_class, self.data_object = self.get_queryset_serializer(gushi_type)
+
         instance = self.get_object()
         # 繁体转换简体
         zh_cn_title = zh_ft_convert_zh_cn(instance.title)
         zh_cn_author = zh_ft_convert_zh_cn(instance.author)
         zh_cn_paragraphs = zh_ft_convert_zh_cn(instance.paragraphs)
         zh_cn_paragraphs = zh_cn_paragraphs.replace("\'", "\"")
-        print(instance.author)
-        print(instance.poet_id,1111)
         _t = self.data_object.get(poet_id=instance.poet_id)
         _t.author = zh_cn_author
         _t.title = zh_cn_title
@@ -65,18 +87,16 @@ class TangShiView(CustomViewBase):
             # 关联节奏
             if _t.strains is None and instance.poet_id is not None:
                 strains = Strains.objects.get(poet_id=instance.poet_id)
-                print(strains)
                 if strains is not None:
                     _t.strains = strains
 
             # 关联作者表
             if _t.author_id is None and instance.poet_id is not None:
-                print(instance.author)
                 author_instance = Author.objects.get(name=instance.author)
                 if author_instance is not None:
                     _t.author_id = author_instance
         except ObjectDoesNotExist as error:
-           print(error,"error")
+            print(error, "error")
         finally:
             _t.save()
             instance = self.get_object()
@@ -84,22 +104,23 @@ class TangShiView(CustomViewBase):
             return JsonResponse(data=serializer.data, code=200, msg="success")
 
 
-class SongCiView(TangShiView):
-    queryset = SongCi.objects.all().order_by('id')
-    serializer_class = SongCiSerializer
-    data_object = SongCi.objects
+    def update(self, request, *args, **kwargs):
 
+        pk = kwargs.pop('pk', -1)
+        gushi_type = kwargs.pop('type', '')
+        self.queryset, self.serializer_class, self.data_object = self.get_queryset_serializer(gushi_type)
+        partial = kwargs.pop('partial', True)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
 
-class TangShiSanBaiView(TangShiView):
-    queryset = TangShiSanBai.objects.all().order_by('id')
-    serializer_class = TangShiSerializer
-    data_object = TangShiSanBai.objects
+        if getattr(instance, '_prefetched_objects_cache', None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
 
-
-class SongCiSanBaiView(TangShiView):
-    queryset = SongCiSanBai.objects.all().order_by('id')
-    serializer_class = SongCiSerializer
-    data_object = SongCiSanBai.objects
+        return JsonResponse(data=serializer.data, msg="success", code=200)
 
 
 def pinyin_convert(text):
@@ -116,7 +137,6 @@ def zh_ft_convert_zh_cn(text):
         return janti
     except:
         return text
-
 
 class Search(filters.SearchFilter):
     search_param = "keyword"
@@ -188,19 +208,19 @@ class SearchView(APIView):
             return pagination_class.get_none_page_response()
 
 
-class GushiView(APIView):
-    # queryset = TangShi.objects.all().order_by("id")
-    # serializer_class = TangShiSerializer
-    # saveAuthor()
-    def get(self, request):
-        # saveAuthor()
-        # save()
-        # saveTangShisanbai()
-        # saveTangShiStrains()
-        # savesongci()
-        # savesongciSanbai()
-        saveSongCiStrains()
-        return JsonResponse(code=233, msg="success")
+# class GushiView(APIView):
+#     # queryset = TangShi.objects.all().order_by("id")
+#     # serializer_class = TangShiSerializer
+#     # saveAuthor()
+#     def get(self, request):
+#         # saveAuthor()
+#         # save()
+#         # saveTangShisanbai()
+#         # saveTangShiStrains()
+#         # savesongci()
+#         # savesongciSanbai()
+#         saveSongCiStrains()
+#         return JsonResponse(code=233, msg="success")
 
 
 def check_json(f, _dir):

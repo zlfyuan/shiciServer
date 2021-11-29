@@ -89,10 +89,10 @@ WSGI_APPLICATION = 'shiciServer.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': env.str('NAME'),
-        'HOST': env.str('HOST'),
-        'USER': env.str('USER'),
-        'PASSWORD': env.str('PAD'),
+        'NAME': env.str('SHICI_NAME'),
+        'HOST': env.str('SHICI_HOST'),
+        'USER': env.str('SHICI_USER'),
+        'PASSWORD': env.str('SHICI_PAD'),
         'OPTIONS': {'charset': 'utf8mb4'},
     }
 }
@@ -235,6 +235,11 @@ DEBUG_LOGGING = {
             # 'level': 'DEBUG',  # 日志的等级为 debug
             'propagate': True,
         },
+        'django.request': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
 }
 PRO_LOGGING = {
@@ -317,6 +322,11 @@ PRO_LOGGING = {
             'level': 'INFO',
             # 'level': 'DEBUG',  # 日志的等级为 debug
             'propagate': True,
+        },
+        'django.request': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
         },
     },
 }
