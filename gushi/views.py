@@ -12,10 +12,10 @@ from setuptools.namespaces import flatten
 from zhconv import convert_for_mw
 
 from .models import Author, TangShi, SongCi, TangShiSanBai, Strains, SongCiSanBai, GuShiPinYins
-from .serializer import TangShiSerializer, SongCiSerializer
-from .utils.custom_json_response import JsonResponse
-from .utils.custom_pagination import LargeResultsSetPagination
-from .utils.custom_viewset_base import CustomViewBase
+from .serializer import TangShiSerializer, SongCiSerializer, StrainsSerializer, GuShiPinYinsSeriliazer
+from utils.custom_json_response import JsonResponse
+from utils.custom_pagination import LargeResultsSetPagination
+from utils.custom_viewset_base import CustomViewBase
 
 
 class GushiView(CustomViewBase):
@@ -38,6 +38,14 @@ class GushiView(CustomViewBase):
             instance = SongCiSanBai.objects.all().order_by('id')
             serializer = SongCiSerializer
             data_object = SongCiSanBai.objects
+        elif gushi_type == "pinyin":
+            instance = GuShiPinYins.objects.all().order_by('id')
+            serializer = GuShiPinYinsSeriliazer
+            data_object = GuShiPinYins.objects
+        elif gushi_type == "strains":
+            instance = Strains.objects.all().order_by('id')
+            serializer = StrainsSerializer
+            data_object = Strains.objects
         else:
             return JsonResponse(msg="fail", code=233)
         return instance, serializer, data_object
@@ -206,7 +214,6 @@ class SearchView(APIView):
             return page_result
         else:
             return pagination_class.get_none_page_response()
-
 
 # class GushiView(APIView):
 #     # queryset = TangShi.objects.all().order_by("id")

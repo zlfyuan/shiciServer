@@ -51,8 +51,10 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'gushi.apps.GushiConfig',
+    'login.apps.LoginConfig',
+    'user.apps.UserConfig'
 ]
-
+AUTH_USER_MODEL = 'user.User'
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -117,8 +119,8 @@ AUTH_PASSWORD_VALIDATORS = [
 
 REST_FRAMEWORK = {
     'PAGE_SIZE': 20,
-    'DEFAULT_PAGINATION_CLASS': 'gushi.utils.custom_pagination.LargeResultsSetPagination',
-    'EXCEPTION_HANDLER': 'gushi.utils.custom_exception.custom_exception_handler',
+    'DEFAULT_PAGINATION_CLASS': 'utils.custom_pagination.LargeResultsSetPagination',
+    'EXCEPTION_HANDLER': 'utils.custom_exception.custom_exception_handler',
     'DEFAULT_AUTHENTICATION_CLASSES': (
         # 'rest_framework_simplejwt.authentication.JWTAuthentication',
         # 'rest_framework.authentication.SessionAuthentication',

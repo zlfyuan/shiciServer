@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
 
-from .models import Author, TangShi, GuShiPinYins, SongCi
+from .models import Author, TangShi, GuShiPinYins, SongCi, Strains
 
 
 class GuShiPinYinsSeriliazer(ModelSerializer):
@@ -36,4 +36,10 @@ class SongCiSerializer(ModelSerializer):
 
     class Meta:
         model = SongCi
+        fields = '__all__'
+
+class StrainsSerializer(ModelSerializer):
+
+    class Meta:
+        model = Strains
         fields = '__all__'
