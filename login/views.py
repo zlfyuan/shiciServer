@@ -42,7 +42,7 @@ class WeixinLogin(APIView):
         if "errcode" not in json_data.keys():
             return JsonResponse(data=json_data, code=status.HTTP_200_OK, msg="微信验证登录成功")
         else:
-            return JsonResponse(data=json_data,code=233,msg="微信验证失败")
+            return JsonResponse(data=json_data,code=1,msg="微信验证失败")
 
 class RegisterView(APIView):
 
@@ -52,14 +52,14 @@ class RegisterView(APIView):
         if ser.is_valid():
             user_obj = User.objects.filter(email=ser['email']).first()
             if user_obj:
-                return JsonResponse(code=233, msg="用户已存在")
+                return JsonResponse(code=1, msg="用户已存在")
             verifyRecord = EmailVerifyRecord.objects.filter(email=ser.validated_data['email']).first()
             if not verifyRecord:
-                return JsonResponse(code=233, msg="验证码没有找到")
+                return JsonResponse(code=1, msg="验证码没有找到")
             if not verifyRecord.send_type == 'register':
-                return JsonResponse(code=233, msg="验证码没有找到")
+                return JsonResponse(code=1, msg="验证码没有找到")
             if verifyRecord.is_invalid():
-                return JsonResponse(code=233, msg="验证码已过期")
+                return JsonResponse(code=1, msg="验证码已过期")
             if verifyRecord.code == ser.validated_data['code']:
                 idx = random.randint(1, 1000009)
                 user = User.objects.create(username=Generator.randomName(),
@@ -68,15 +68,15 @@ class RegisterView(APIView):
                 user.save()
                 verifyRecord.delete()
                 return JsonResponse(code=status.HTTP_200_OK, msg="注册成功")
-            return JsonResponse(code=233, msg="验证码有误")
-        return JsonResponse(code=233, msg=get_detail_error(ser))
+            return JsonResponse(code=1, msg="验证码有误")
+        return JsonResponse(code=1, msg=get_detail_error(ser))
 
 
 class LoginView(TokenObtainPairView):
 
     def post(self, request, *args, **kwargs):
         ser = LoginSerializers(data=request.data)
-
+        ser.is_valid(raise_exception=True)
         if request.data["code"] == "6666":
             user_obj = User.objects.filter(email=request.data['email']).first()
             if not user_obj:
@@ -93,12 +93,12 @@ class LoginView(TokenObtainPairView):
         ser.is_valid(raise_exception=True)
         verifyRecord = EmailVerifyRecord.objects.filter(email=ser.validated_data["email"], send_type="login").first()
         if not verifyRecord:
-            return JsonResponse(code=233, msg="验证码没有找到")
+            return JsonResponse(code=1, msg="验证码没有找到")
         if not verifyRecord.send_type == 'login':
-            return JsonResponse(code=233, msg="验证码没有找到")
+            return JsonResponse(code=1, msg="验证码没有找到")
         if verifyRecord.is_invalid():
             print(verifyRecord.code)
-            return JsonResponse(code=233, msg="验证码已过期")
+            return JsonResponse(code=1, msg="验证码已过期")
         if verifyRecord.code == ser.validated_data['code']:
             user_obj = User.objects.filter(email=ser.validated_data['email']).first()
             if not user_obj:
@@ -125,11 +125,11 @@ class ChangePasswordView(APIView):
         if ser.is_valid():
             user_obj = User.objects.filter(username=request.user.username).first()
             if not user_obj.check_password(ser.validated_data['old_password']):
-                return JsonResponse(code=233, msg="原密码错误")
+                return JsonResponse(code=1, msg="原密码错误")
             user_obj.set_password(ser.validated_data['new_password'])
             user_obj.save()
             return JsonResponse(code=status.HTTP_200_OK, msg="修改成功")
-        return JsonResponse(code=233, msg=get_detail_error(ser))
+        return JsonResponse(code=1, msg=get_detail_error(ser))
 
 
 class ForgetPasswordView(APIView):
@@ -139,17 +139,17 @@ class ForgetPasswordView(APIView):
         if ser.is_valid():
             verifyRecord = EmailVerifyRecord.objects.filter(email=request.user.email).first()
             if not verifyRecord:
-                return JsonResponse(code=233, msg="验证码没有找到")
+                return JsonResponse(code=1, msg="验证码没有找到")
             if not verifyRecord.send_type == 'forget':
-                return JsonResponse(code=233, msg="验证码没有找到")
+                return JsonResponse(code=1, msg="验证码没有找到")
             if verifyRecord.is_invalid():
-                return JsonResponse(code=233, msg="验证码已过期")
+                return JsonResponse(code=1, msg="验证码已过期")
             if verifyRecord.code == ser.validated_data['code']:
                 request.user.set_password(ser['new_password'])
                 request.user.save()
                 return JsonResponse(code=status.HTTP_200_OK, msg="修改成功")
-            return JsonResponse(code=233, msg="修改失败")
-        return JsonResponse(code=233, msg=get_detail_error(ser))
+            return JsonResponse(code=1, msg="修改失败")
+        return JsonResponse(code=1, msg=get_detail_error(ser))
 
 
 @api_view(['POST'])
@@ -164,7 +164,7 @@ class SendEmailCodeView(APIView):
         try:
             res = EmailVerifyRecordSerializers(data=request.data)
             if not res.is_valid():
-                return JsonResponse(code=233, msg=get_detail_error(res))
+                return JsonResponse(code=1, msg=get_detail_error(res))
             email = res.validated_data['email']
             send_type = res.validated_data['send_type']
             # 发送邮箱
@@ -172,10 +172,10 @@ class SendEmailCodeView(APIView):
             if res_email:
                 return JsonResponse(code=status.HTTP_200_OK, msg="发送成功")
             else:
-                return JsonResponse(code=233, msg="验证码发送失败, 请稍后重试")
+                return JsonResponse(code=1, msg="验证码发送失败, 请稍后重试")
         except Exception as e:
             print("错误信息 : ", e)
-        return JsonResponse(code=233, msg="邮箱错误, 请稍后重试")
+        return JsonResponse(code=1, msg="邮箱错误, 请稍后重试")
 
 
 # 发送电子邮件

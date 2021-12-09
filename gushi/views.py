@@ -6,7 +6,8 @@ from django.core.exceptions import ObjectDoesNotExist
 
 # Create your views here.
 from pypinyin import pinyin
-from rest_framework import filters
+from rest_framework import filters, serializers
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.views import APIView
 from setuptools.namespaces import flatten
 from zhconv import convert_for_mw
@@ -20,8 +21,10 @@ from utils.custom_viewset_base import CustomViewBase
 
 class GushiView(CustomViewBase):
     data_object = None
+    permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get_queryset_serializer(self, gushi_type):
+
         if gushi_type == "tangshi":
             instance = TangShi.objects.all().order_by('id')
             serializer = TangShiSerializer
@@ -47,7 +50,7 @@ class GushiView(CustomViewBase):
             serializer = StrainsSerializer
             data_object = Strains.objects
         else:
-            return JsonResponse(msg="fail", code=233)
+            raise  serializers.ValidationError("参数错误", 1)
         return instance, serializer, data_object
 
     def list(self, request, *args, **kwargs):
@@ -227,7 +230,7 @@ class SearchView(APIView):
 #         # savesongci()
 #         # savesongciSanbai()
 #         saveSongCiStrains()
-#         return JsonResponse(code=233, msg="success")
+#         return JsonResponse(code=1, msg="success")
 
 
 def check_json(f, _dir):
