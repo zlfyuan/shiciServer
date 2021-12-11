@@ -1,10 +1,10 @@
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
 
-from .models import Author, TangShi, GuShiPinYins, SongCi, Strains
+from .models import Author, TangShi, GuShiPinYins, SongCi, Strains, YuanQu, ShiJing, LunYu
 
 
-class GuShiPinYinsSeriliazer(ModelSerializer):
+class GuShiPinYinsSerializer(ModelSerializer):
     class Meta:
         model = GuShiPinYins
         fields = '__all__'
@@ -42,4 +42,23 @@ class StrainsSerializer(ModelSerializer):
 
     class Meta:
         model = Strains
+        fields = '__all__'
+
+
+class YuanQuSerializer(ModelSerializer):
+
+    class Meta:
+        model = YuanQu
+        fields = '__all__'
+
+
+class ShiJingSerializer(ModelSerializer):
+    class Meta:
+        model = ShiJing
+        fields = '__all__'
+
+
+class LunYuSerializer(ModelSerializer):
+    class Meta:
+        model = LunYu
         fields = '__all__'

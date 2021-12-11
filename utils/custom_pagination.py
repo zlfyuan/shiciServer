@@ -9,11 +9,8 @@ class LargeResultsSetPagination(PageNumberPagination):
     max_page_size = 20
 
     def get_paginated_response(self, data):
-        code = 200
+        code = 0
         msg = 'success'
-        if not data:
-            code = 404
-            msg = "Data Not Found"
 
         return Response(OrderedDict([
             ('code', code),
@@ -22,14 +19,4 @@ class LargeResultsSetPagination(PageNumberPagination):
             ('next', self.get_next_link()),
             ('previous', self.get_previous_link()),
             ('data', data),
-        ]))
-
-    def get_none_page_response(self):
-        return Response(OrderedDict([
-            ('code', 200),
-            ('message', "success"),
-            ('count', None),
-            ('next', None),
-            ('previous', None),
-            ('data', None),
         ]))

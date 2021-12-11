@@ -12,8 +12,9 @@ from rest_framework.views import APIView
 from setuptools.namespaces import flatten
 from zhconv import convert_for_mw
 
-from .models import Author, TangShi, SongCi, TangShiSanBai, Strains, SongCiSanBai, GuShiPinYins
-from .serializer import TangShiSerializer, SongCiSerializer, StrainsSerializer, GuShiPinYinsSeriliazer
+from .models import Author, TangShi, SongCi, TangShiSanBai, Strains, SongCiSanBai, GuShiPinYins, YuanQu, LunYu, ShiJing
+from .serializer import TangShiSerializer, SongCiSerializer, StrainsSerializer, \
+    YuanQuSerializer, ShiJingSerializer, LunYuSerializer, GuShiPinYinsSerializer
 from utils.custom_json_response import JsonResponse
 from utils.custom_pagination import LargeResultsSetPagination
 from utils.custom_viewset_base import CustomViewBase
@@ -41,16 +42,20 @@ class GushiView(CustomViewBase):
             instance = SongCiSanBai.objects.all().order_by('id')
             serializer = SongCiSerializer
             data_object = SongCiSanBai.objects
-        elif gushi_type == "pinyin":
-            instance = GuShiPinYins.objects.all().order_by('id')
-            serializer = GuShiPinYinsSeriliazer
-            data_object = GuShiPinYins.objects
-        elif gushi_type == "strains":
-            instance = Strains.objects.all().order_by('id')
-            serializer = StrainsSerializer
-            data_object = Strains.objects
+        elif gushi_type == "yuanqu":
+            instance = YuanQu.objects.all().order_by('id')
+            serializer = YuanQuSerializer
+            data_object = YuanQu.objects
+        elif gushi_type == "shijing":
+            instance = ShiJing.objects.all().order_by('id')
+            serializer = ShiJingSerializer
+            data_object = ShiJing.objects
+        elif gushi_type == "lunyu":
+            instance = LunYu.objects.all().order_by('id')
+            serializer = LunYuSerializer
+            data_object = LunYu.objects
         else:
-            raise  serializers.ValidationError("参数错误", 1)
+            raise serializers.ValidationError("参数错误", 1)
         return instance, serializer, data_object
 
     def list(self, request, *args, **kwargs):
@@ -78,7 +83,10 @@ class GushiView(CustomViewBase):
         zh_cn_author = zh_ft_convert_zh_cn(instance.author)
         zh_cn_paragraphs = zh_ft_convert_zh_cn(instance.paragraphs)
         zh_cn_paragraphs = zh_cn_paragraphs.replace("\'", "\"")
-        _t = self.data_object.get(poet_id=instance.poet_id)
+        if instance.poet_id is None:
+            _t = self.data_object.get(id=instance.id)
+        else:
+            _t = self.data_object.get(poet_id=instance.poet_id)
         _t.author = zh_cn_author
         _t.title = zh_cn_title
         _t.paragraphs = zh_cn_paragraphs
@@ -112,8 +120,7 @@ class GushiView(CustomViewBase):
             _t.save()
             instance = self.get_object()
             serializer = self.get_serializer(instance)
-            return JsonResponse(data=serializer.data, code=200, msg="success")
-
+            return JsonResponse(data=serializer.data, code=0, msg="success")
 
     def update(self, request, *args, **kwargs):
 
@@ -131,7 +138,48 @@ class GushiView(CustomViewBase):
             # forcibly invalidate the prefetch cache on the instance.
             instance._prefetched_objects_cache = {}
 
-        return JsonResponse(data=serializer.data, msg="success", code=200)
+        return JsonResponse(data=serializer.data, msg="success", code=0)
+
+class PinyinView(CustomViewBase):
+    permission_classes = [IsAuthenticatedOrReadOnly]
+    queryset = GuShiPinYins.objects.all().order_by('id')
+    serializer_class = GuShiPinYinsSerializer
+    data_object = GuShiPinYins.objects
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', True)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        if getattr(instance, '_prefetched_objects_cache', None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
+
+        return JsonResponse(data=serializer.data, msg="success", code=0)
+
+
+class StrainsView(CustomViewBase):
+    permission_classes = [IsAuthenticatedOrReadOnly]
+    queryset = Strains.objects.all().order_by('id')
+    serializer_class = StrainsSerializer
+    data_object = Strains.objects
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', True)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        if getattr(instance, '_prefetched_objects_cache', None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
+
+        return JsonResponse(data=serializer.data, msg="success", code=0)
 
 
 def pinyin_convert(text):
@@ -149,6 +197,7 @@ def zh_ft_convert_zh_cn(text):
     except:
         return text
 
+
 class Search(filters.SearchFilter):
     search_param = "keyword"
 
@@ -163,7 +212,7 @@ class SearchView(APIView):
 
         self.search_fields = [search_type]
         print(source)
-        if source == "TangShi":
+        if source == "tangshi":
             print(source, 1)
             contentlist = TangShi.objects.all().order_by('id')
 
@@ -176,7 +225,7 @@ class SearchView(APIView):
             page_result = pagination_class.get_paginated_response(result_serializer.data)
 
             return page_result
-        elif source == "SongCi":
+        elif source == "songci":
             print(source, 2)
             contentlist = SongCi.objects.all().order_by('id')
 
@@ -189,7 +238,7 @@ class SearchView(APIView):
             page_result = pagination_class.get_paginated_response(result_serializer.data)
 
             return page_result
-        elif source == "TangshiSanBai":
+        elif source == "tangshisanbai":
             print(source, 3)
             contentlist = TangShiSanBai.objects.all().order_by('id')
 
@@ -202,7 +251,7 @@ class SearchView(APIView):
             page_result = pagination_class.get_paginated_response(result_serializer.data)
 
             return page_result
-        elif source == "SongCiSanBai":
+        elif source == "songcisanbai":
             print(source, 4)
             contentlist = SongCi.objects.all().order_by('id')
 
@@ -215,22 +264,63 @@ class SearchView(APIView):
             page_result = pagination_class.get_paginated_response(result_serializer.data)
 
             return page_result
-        else:
-            return pagination_class.get_none_page_response()
+        elif source == "yuanqu":
+            print(source, 4)
+            contentlist = YuanQu.objects.all().order_by('id')
 
-# class GushiView(APIView):
-#     # queryset = TangShi.objects.all().order_by("id")
-#     # serializer_class = TangShiSerializer
-#     # saveAuthor()
-#     def get(self, request):
-#         # saveAuthor()
-#         # save()
-#         # saveTangShisanbai()
-#         # saveTangShiStrains()
-#         # savesongci()
-#         # savesongciSanbai()
-#         saveSongCiStrains()
-#         return JsonResponse(code=1, msg="success")
+            search_query = search_class.filter_queryset(request=request, queryset=contentlist, view=self)
+
+            page_query = pagination_class.paginate_queryset(queryset=search_query, request=request, view=self)
+
+            result_serializer = YuanQuSerializer(page_query, many=True)
+
+            page_result = pagination_class.get_paginated_response(result_serializer.data)
+
+            return page_result
+        elif source == "shijing":
+            print(source, 4)
+            contentlist = ShiJing.objects.all().order_by('id')
+
+            search_query = search_class.filter_queryset(request=request, queryset=contentlist, view=self)
+
+            page_query = pagination_class.paginate_queryset(queryset=search_query, request=request, view=self)
+
+            result_serializer = ShiJingSerializer(page_query, many=True)
+
+            page_result = pagination_class.get_paginated_response(result_serializer.data)
+
+            return page_result
+        elif source == "lunyu":
+            print(source, 4)
+            contentlist = LunYu.objects.all().order_by('id')
+
+            search_query = search_class.filter_queryset(request=request, queryset=contentlist, view=self)
+
+            page_query = pagination_class.paginate_queryset(queryset=search_query, request=request, view=self)
+
+            result_serializer = LunYuSerializer(page_query, many=True)
+
+            page_result = pagination_class.get_paginated_response(result_serializer.data)
+
+            return page_result
+        else:
+            return pagination_class.get_paginated_response(data=None)
+
+
+class SaveView(APIView):
+
+    def get(self, request):
+        # saveAuthor()
+        # save()
+        # saveTangShisanbai()
+        # saveTangShiStrains()
+        # savesongci()
+        # savesongciSanbai()
+        # saveSongCiStrains()
+        # saveyuanqu()
+        # savelunyu()
+        saveshijing()
+        return JsonResponse(code=1, msg="success")
 
 
 def check_json(f, _dir):
@@ -448,6 +538,79 @@ def saveSongCiStrains():
                 )
             except ValueError:
                 print(ValueError)
+
+    end_time = time.time()
+    # 关闭数据库连接
+    print("耗时: {:.2f}秒".format(end_time - start_time))
+
+
+def saveyuanqu():
+    start_time = time.time()
+    list = check_json("yuanqu.json", "gushi/chinese-poetry/yuanqu/")
+    for idx in range(0, len(list)):
+        item = list[idx]
+        print(item)
+
+        author = item["author"]
+        dynasty = item["dynasty"]
+        title = item["title"]
+        paragraphs = item["paragraphs"]
+        try:
+            YuanQu.objects.update_or_create(
+                author=author,
+                title=title,
+                paragraphs=paragraphs,
+                dynasty=dynasty
+            )
+        except ValueError:
+            print(ValueError)
+
+    end_time = time.time()
+    # 关闭数据库连接
+    print("耗时: {:.2f}秒".format(end_time - start_time))
+
+
+def savelunyu():
+    start_time = time.time()
+    list = check_json("lunyu.json", "gushi/chinese-poetry/lunyu/")
+    for idx in range(0, len(list)):
+        item = list[idx]
+        print(item)
+
+        chapter = item["chapter"]
+        paragraphs = item["paragraphs"]
+        try:
+            LunYu.objects.update_or_create(
+                title=chapter,
+                author=chapter,
+                paragraphs=paragraphs,
+            )
+        except ValueError:
+            print(ValueError)
+
+    end_time = time.time()
+    # 关闭数据库连接
+    print("耗时: {:.2f}秒".format(end_time - start_time))
+
+
+def saveshijing():
+    start_time = time.time()
+    list = check_json("shijing.json", "gushi/chinese-poetry/shijing/")
+    for idx in range(0, len(list)):
+        item = list[idx]
+        print(item)
+        title = item['title']
+        section = item["section"]
+        chapter = item["chapter"]
+        content = item["content"]
+        try:
+            ShiJing.objects.update_or_create(
+                title=title,
+                paragraphs=content,
+                author=section,
+            )
+        except ValueError:
+            print(ValueError)
 
     end_time = time.time()
     # 关闭数据库连接
